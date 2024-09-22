@@ -17,14 +17,14 @@ jobs:
         python-version: '3.9'
     - name: Install dependencies
       run: |
-        cd backend
+        cd Services
         pip install -r requirements.txt
     - name: Run tests
       run: |
-        cd backend
+        cd Services
         pytest
 
-  build-and-push:
+  trigger-codepipeline:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
@@ -36,52 +36,6 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-    - name: Build, tag, and push image to Amazon ECR
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: laundry-service-ecr-repo
-        IMAGE_TAG: ${{ github.sha }}
+    - name: Trigger CodePipeline
       run: |
-        cd backend
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-  deploy-to-dev:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    steps:
-    - uses: actions/checkout@v2
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-    - name: Deploy to Dev
-      run: |
-        cd infrastructure
-        npm install
-        npx cdk deploy LaundryServiceStack-Dev --require-approval never
-
-  deploy-to-prod:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
-    steps:
-    - uses: actions/checkout@v2
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-    - name: Deploy to Production
-      run: |
-        cd infrastructure
-        npm install
-        npx cdk deploy LaundryServiceStack-Prod --require-approval never
+        aws codepipeline start-pipeline-execution --name LaundryServicePipeline
