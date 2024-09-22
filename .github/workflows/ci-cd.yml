@@ -2,9 +2,9 @@
 
 # on:
 #   push:
-#     branches: [ main, develop ]
+#     branches: [main, develop]
 #   pull_request:
-#     branches: [ main, develop ]
+#     branches: [main, develop]
 
 # jobs:
 #   test:
@@ -19,6 +19,12 @@
 #       run: |
 #         cd Services
 #         pip install -r requirements.txt
+#     - name: Set PYTHONPATH
+#       run: |
+#         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
+#     - name: Set environment variables for AWS
+#       run: |
+#         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 #     - name: Run tests
 #       run: |
 #         cd Services
@@ -42,7 +48,7 @@
 #     - name: Build, tag, and push image to Amazon ECR
 #       env:
 #         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-#         ECR_REPOSITORY: laundry-service-ecr-repo
+#         ECR_REPOSITORY: laundry-service-repo
 #         IMAGE_TAG: ${{ github.sha }}
 #       run: |
 #         cd Services
@@ -85,44 +91,36 @@
 #         cd backend-infrastructure
 #         npm install
 #         npx cdk deploy LaundryServiceStack-Prod --require-approval never
-
-name: CI/CD
+name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
-# jobs:
-#   test:
-#     runs-on: ubuntu-latest
-#     steps:
-#     - uses: actions/checkout@v2
-#     - name: Set up Python
-#       uses: actions/setup-python@v2
-#       with:
-#         python-version: '3.9'
-#     - name: Install dependencies
-#       run: |
-#         cd Services
-#         pip install -r requirements.txt
-#     - name: Run tests
-#       run: |
-#         cd Services
-#         pytest
-
-  trigger-codepipeline:
+jobs:
+  test:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     steps:
     - uses: actions/checkout@v2
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+    - name: Set up Python
+      uses: actions/setup-python@v2
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-    - name: Trigger CodePipeline
+        python-version: '3.9'
+    - name: Install dependencies
       run: |
-        aws codepipeline start-pipeline-execution --name LaundryServicePipeline
+        cd Services
+        pip install -r requirements.txt
+    - name: Set PYTHONPATH
+      run: |
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
+    - name: Set environment variables for AWS
+      run: |
+        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+    - name: Run tests
+      run: |
+        cd Services
+        pytest
+
+# Remove build and deployment from GitHub Actions and move it to AWS CodePipeline
