@@ -103,17 +103,13 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: '3.9'
-    - name: Cache pip dependencies
-      uses: actions/cache@v2
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
     - name: Install dependencies
       run: |
         cd Services
         pip install -r requirements.txt
+    - name: Set PYTHONPATH
+      run: |
+        export PYTHONPATH=$PYTHONPATH:$(pwd)/src
     - name: Run tests
       run: |
         cd Services
@@ -137,7 +133,7 @@ jobs:
     - name: Build, tag, and push image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: laundry-service-repo
+        ECR_REPOSITORY: laundry-service-ecr-repo
         IMAGE_TAG: ${{ github.sha }}
       run: |
         cd Services
