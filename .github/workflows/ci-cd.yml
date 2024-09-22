@@ -109,7 +109,7 @@ jobs:
         pip install -r requirements.txt
     - name: Set PYTHONPATH
       run: |
-        export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
     - name: Run tests
       run: |
         cd Services
