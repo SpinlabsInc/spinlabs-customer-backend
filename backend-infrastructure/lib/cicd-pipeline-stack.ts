@@ -124,7 +124,6 @@ import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
@@ -176,30 +175,33 @@ export class CICDPipelineStack extends cdk.Stack {
           },
           pre_build: {
             commands: [
-              'pytest', // Run your tests before building Docker image
+              'pytest tests',  // Ensure that pytest runs in the correct folder
             ],
           },
           build: {
             commands: [
+              // Build Docker image and push to ECR
               'docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .',
               'docker push $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION',
+              // Generate imageDetail.json containing the image URI for deployment
+              'printf \'{"ImageURI":"%s"}\' $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION > imageDetail.json',
             ],
           },
         },
         artifacts: {
-          files: ['imageDetail.json']
+          files: ['imageDetail.json'],  // Ensure the correct path for the artifact
         },
       }),
     });
 
-    // Grant permissions to push to ECR
+    // Grant permissions to CodeBuild to push to ECR
     props.ecrRepository.grantPullPush(buildProject.role!);
 
     // Deploy action: Deploy to ECS using Docker image from ECR
     const deployAction = new codepipeline_actions.EcsDeployAction({
       actionName: 'DeployToECS',
       service: props.ecsService,
-      imageFile: new codepipeline.ArtifactPath(sourceOutput, 'imageDetail.json'),
+      imageFile: new codepipeline.ArtifactPath(sourceOutput, 'imageDetail.json'), // Ensure the correct path for the image artifact
     });
 
     // Create CodePipeline
@@ -217,12 +219,13 @@ export class CICDPipelineStack extends cdk.Stack {
             actionName: 'Build',
             project: buildProject,
             input: sourceOutput,
+            outputs: [sourceOutput],  // Make sure the output includes the artifact
           })],
         },
         {
           stageName: 'Deploy',
           actions: [deployAction],
-        }
+        },
       ],
     });
   }
