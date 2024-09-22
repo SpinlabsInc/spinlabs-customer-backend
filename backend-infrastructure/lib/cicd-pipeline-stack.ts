@@ -153,48 +153,48 @@ export class CICDPipelineStack extends cdk.Stack {
 
     // Build project: Running tests and building Docker image
     const buildProject = new codebuild.PipelineProject(this, 'BuildProject', {
-      environment: {
-        buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
-        privileged: true,
-      },
-      environmentVariables: {
-        ECR_REPO_URI: { value: props.ecrRepository.repositoryUri },
-      },
-      buildSpec: codebuild.BuildSpec.fromObject({
-        version: '0.2',
-        phases: {
-          install: {
-            'runtime-versions': {
-              python: 3.9,
+        environment: {
+          buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
+          privileged: true,
+        },
+        environmentVariables: {
+          ECR_REPO_URI: { value: props.ecrRepository.repositoryUri },
+        },
+        buildSpec: codebuild.BuildSpec.fromObject({
+          version: '0.2',
+          phases: {
+            install: {
+              'runtime-versions': {
+                python: 3.9,
+              },
+              commands: [
+                'cd Services',
+                'pip install --upgrade pip',
+                'pip install -r requirements.txt',
+              ],
             },
-            commands: [
-              'cd Services',
-              'pip install --upgrade pip',
-              'pip install -r requirements.txt',
-            ],
+            pre_build: {
+              commands: [
+                // Set PYTHONPATH to include the src directory
+                'export PYTHONPATH=$PYTHONPATH:$(pwd)/src',
+                'pytest',  // Ensure tests are run after setting the PYTHONPATH
+              ],
+            },
+            build: {
+              commands: [
+                // Docker build and push
+                'docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .',
+                'docker push $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION',
+                'printf \'{"ImageURI":"%s"}\' $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION > imageDetail.json',
+              ],
+            },
           },
-          pre_build: {
-            commands: [
-              'echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $CODEBUILD_SRC_DIR/Services/.env',
-              'pytest tests',  // Run tests
-            ],
+          artifacts: {
+            files: ['imageDetail.json'],
           },
-          build: {
-            commands: [
-              // Build Docker image and push to ECR
-              'docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .',
-              'docker push $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION',
-              // Generate imageDetail.json containing the image URI for deployment
-              'printf \'{"ImageURI":"%s"}\' $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION > imageDetail.json',
-            ],
-          },
-        },
-        artifacts: {
-          files: ['imageDetail.json'],  // Ensure the correct path for the artifact
-        },
-      }),
-    });
-
+        }),
+      });
+      
     // Grant permissions to CodeBuild to push to ECR
     props.ecrRepository.grantPullPush(buildProject.role!);
 
