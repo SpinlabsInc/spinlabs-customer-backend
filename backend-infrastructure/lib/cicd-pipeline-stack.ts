@@ -124,6 +124,7 @@ import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
@@ -140,10 +141,25 @@ export class CICDPipelineStack extends cdk.Stack {
     // Fetch the GitHub token secret from Secrets Manager
     const githubToken = secretsmanager.Secret.fromSecretNameV2(this, 'GithubToken', 'GithubToken').secretValueFromJson('GithubToken');
 
-    // Create a CodeBuild project for testing
-    const testProject = new codebuild.PipelineProject(this, 'TestProject', {
+    // Source action: GitHub as source
+    const sourceOutput = new codepipeline.Artifact();
+    const sourceAction = new codepipeline_actions.GitHubSourceAction({
+      actionName: 'GitHub_Source',
+      owner: 'SpinlabsInc', // Your GitHub org
+      repo: 'spinlabs-customer-backend', // Your GitHub repo
+      oauthToken: githubToken,  // Token from Secrets Manager
+      output: sourceOutput,
+      branch: 'main', // or 'develop'
+    });
+
+    // Build project: Running tests and building Docker image
+    const buildProject = new codebuild.PipelineProject(this, 'BuildProject', {
       environment: {
         buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
+        privileged: true,
+      },
+      environmentVariables: {
+        ECR_REPO_URI: { value: props.ecrRepository.repositoryUri },
       },
       buildSpec: codebuild.BuildSpec.fromObject({
         version: '0.2',
@@ -158,27 +174,11 @@ export class CICDPipelineStack extends cdk.Stack {
               'pip install -r requirements.txt',
             ],
           },
-          build: {
+          pre_build: {
             commands: [
-              'pytest', // Run tests as a separate phase
+              'pytest', // Run your tests before building Docker image
             ],
           },
-        },
-      }),
-    });
-
-    // Create a CodeBuild project for building and pushing Docker image to ECR
-    const buildProject = new codebuild.PipelineProject(this, 'BuildProject', {
-      environment: {
-        buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
-        privileged: true, // For Docker
-      },
-      environmentVariables: {
-        ECR_REPO_URI: { value: props.ecrRepository.repositoryUri },
-      },
-      buildSpec: codebuild.BuildSpec.fromObject({
-        version: '0.2',
-        phases: {
           build: {
             commands: [
               'docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .',
@@ -187,7 +187,7 @@ export class CICDPipelineStack extends cdk.Stack {
           },
         },
         artifacts: {
-          files: ['imageDetail.json'],
+          files: ['imageDetail.json']
         },
       }),
     });
@@ -195,76 +195,35 @@ export class CICDPipelineStack extends cdk.Stack {
     // Grant permissions to push to ECR
     props.ecrRepository.grantPullPush(buildProject.role!);
 
-    // Create a CodePipeline
-    const pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
-      pipelineName: 'LaundryServicePipeline',
-      crossAccountKeys: false,
-    });
-
-    // Source stage
-    const sourceOutput = new codepipeline.Artifact();
-    const sourceAction = new codepipeline_actions.GitHubSourceAction({
-      actionName: 'GitHub_Source',
-      owner: 'SpinlabsInc',
-      repo: 'spinlabs-customer-backend',
-      oauthToken: githubToken,
-      output: sourceOutput,
-      branch: 'main', // This can be 'develop' for the dev environment
-    });
-
-    pipeline.addStage({
-      stageName: 'Source',
-      actions: [sourceAction],
-    });
-
-    // Test stage
-    const testOutput = new codepipeline.Artifact();
-    const testAction = new codepipeline_actions.CodeBuildAction({
-      actionName: 'Test',
-      project: testProject,
-      input: sourceOutput,
-      outputs: [testOutput],
-    });
-
-    pipeline.addStage({
-      stageName: 'Test',
-      actions: [testAction],
-    });
-
-    // Build stage
-    const buildOutput = new codepipeline.Artifact();
-    const buildAction = new codepipeline_actions.CodeBuildAction({
-      actionName: 'Build',
-      project: buildProject,
-      input: sourceOutput,
-      outputs: [buildOutput],
-    });
-
-    pipeline.addStage({
-      stageName: 'Build',
-      actions: [buildAction],
-    });
-
-    // Manual approval stage
-    const approvalAction = new codepipeline_actions.ManualApprovalAction({
-      actionName: 'Approve',
-    });
-
-    pipeline.addStage({
-      stageName: 'Approve',
-      actions: [approvalAction],
-    });
-
-    // Deploy stage
+    // Deploy action: Deploy to ECS using Docker image from ECR
     const deployAction = new codepipeline_actions.EcsDeployAction({
       actionName: 'DeployToECS',
       service: props.ecsService,
-      imageFile: buildOutput.atPath('imageDetail.json'),
+      imageFile: new codepipeline.ArtifactPath(sourceOutput, 'imageDetail.json'),
     });
 
-    pipeline.addStage({
-      stageName: 'Deploy',
-      actions: [deployAction],
+    // Create CodePipeline
+    const pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
+      pipelineName: 'LaundryServicePipeline',
+      crossAccountKeys: false,
+      stages: [
+        {
+          stageName: 'Source',
+          actions: [sourceAction],
+        },
+        {
+          stageName: 'Build',
+          actions: [new codepipeline_actions.CodeBuildAction({
+            actionName: 'Build',
+            project: buildProject,
+            input: sourceOutput,
+          })],
+        },
+        {
+          stageName: 'Deploy',
+          actions: [deployAction],
+        }
+      ],
     });
   }
 }
