@@ -175,7 +175,8 @@ export class CICDPipelineStack extends cdk.Stack {
           },
           pre_build: {
             commands: [
-              'pytest tests',  // Ensure that pytest runs in the correct folder
+              'echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $CODEBUILD_SRC_DIR/Services/.env',
+              'pytest tests',  // Run tests
             ],
           },
           build: {
