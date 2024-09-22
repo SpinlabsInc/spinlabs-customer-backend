@@ -40,15 +40,15 @@
 # async def health_check():
 #     return {"status": "healthy"}
 
+import boto3
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import boto3
 from boto3.dynamodb.conditions import Key
 
 app = FastAPI()
 
-# Initialize DynamoDB client
-dynamodb = boto3.resource('dynamodb')
+# Initialize DynamoDB client with a specific region
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')  # Specify your region here
 table = dynamodb.Table('LaundryUsers')
 
 class User(BaseModel):
