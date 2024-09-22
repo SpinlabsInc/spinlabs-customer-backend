@@ -1,0 +1,23 @@
+{
+    "family": "laundry-service-task",
+    "containerDefinitions": [
+      {
+        "name": "LaundryServiceContainer",
+        "image": "<IMAGE1_NAME>",
+        "portMappings": [
+          {
+            "containerPort": 80,
+            "hostPort": 80,
+            "protocol": "tcp"
+          }
+        ],
+        "essential": true
+      }
+    ],
+    "cpu": "256",
+    "memory": "512",
+    "networkMode": "awsvpc",
+    "requiresCompatibilities": [
+      "FARGATE"
+    ]
+  }
