@@ -34,10 +34,22 @@ phases:
       python: 3.9
   pre_build:
     commands:
+      - echo "Printing all environment variables:"
+      - env
+      - echo "ECR_REPO_URI: ${ECR_REPO_URI:-not set}"
+      - echo "AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-not set}"
+      - echo "CODEBUILD_RESOLVED_SOURCE_VERSION: ${CODEBUILD_RESOLVED_SOURCE_VERSION:-not set}"
+      - |
+        if [ -z "$AWS_DEFAULT_REGION" ]; then
+          echo "AWS_DEFAULT_REGION is not set. Using us-east-1 as default."
+          export AWS_DEFAULT_REGION=us-east-1
+        fi
+      - |
+        if [ -z "$CODEBUILD_RESOLVED_SOURCE_VERSION" ]; then
+          echo "CODEBUILD_RESOLVED_SOURCE_VERSION is not set. Using timestamp as fallback."
+          export CODEBUILD_RESOLVED_SOURCE_VERSION=$(date +%Y%m%d%H%M%S)
+        fi
       - echo Logging in to Amazon ECR...
-      - aws --version
-      - echo $AWS_DEFAULT_REGION
-      - echo $ECR_REPO_URI
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
@@ -45,7 +57,6 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
-      - cd Services
       - docker build -t $ECR_REPO_URI:$IMAGE_TAG .
       - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:latest
   post_build:
@@ -55,7 +66,6 @@ phases:
       - docker push $ECR_REPO_URI:$IMAGE_TAG
       - docker push $ECR_REPO_URI:latest
       - echo Writing image definitions file...
-      - cd..
       - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$IMAGE_TAG > imageDetail.json
       - cat imageDetail.json
 
