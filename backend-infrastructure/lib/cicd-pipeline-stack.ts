@@ -48,6 +48,11 @@ export class CICDPipelineStack extends cdk.Stack {
     // Grant permissions to CodeBuild to push to ECR
     props.ecrRepository.grantPullPush(buildProject.role!);
     buildProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['secretsmanager:GetSecretValue'],
+      resources: ['arn:aws:secretsmanager:us-east-1:448049814374:secret:DockerHubCredentials-HH2LVS'],
+    }));
+    
+    buildProject.addToRolePolicy(new iam.PolicyStatement({
       actions: [
         "ecr:GetAuthorizationToken",
         "ecr:BatchCheckLayerAvailability",
