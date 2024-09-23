@@ -260,22 +260,21 @@ export class CICDPipelineStack extends cdk.Stack {
       repo: 'spinlabs-customer-backend',
       oauthToken: githubToken,
       output: sourceOutput,
-      branch: 'main', // or 'develop' depending on your workflow
+      branch: 'main',
     });
 
     const buildProject = new codebuild.PipelineProject(this, 'BuildProject', {
-        environment: {
-          buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
-          privileged: true,
-        },
-        environmentVariables: {
-          ECR_REPO_URI: { value: props.ecrRepository.repositoryUri },
-          AWS_DEFAULT_REGION: { value: this.region },
-          CODEBUILD_RESOLVED_SOURCE_VERSION: { value: 'CODEBUILD_RESOLVED_SOURCE_VERSION' },
-        },
-        buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
-      });
-      
+      environment: {
+        buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
+        privileged: true,
+      },
+      environmentVariables: {
+        ECR_REPO_URI: { value: props.ecrRepository.repositoryUri },
+        AWS_DEFAULT_REGION: { value: this.region },
+      },
+      buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
+    });
+
     // Grant permissions to the build project
     props.ecrRepository.grantPullPush(buildProject.role!);
     buildProject.addToRolePolicy(new iam.PolicyStatement({
