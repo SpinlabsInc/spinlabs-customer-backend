@@ -1,41 +1,41 @@
-import * as cdk from 'aws-cdk-lib';
-import * as ecs from 'aws-cdk-lib/aws-ecs';
-import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
-import * as ecr from 'aws-cdk-lib/aws-ecr';
-import { Construct } from 'constructs';
+// import * as cdk from 'aws-cdk-lib';
+// import * as ecs from 'aws-cdk-lib/aws-ecs';
+// import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
+// import * as ecr from 'aws-cdk-lib/aws-ecr';
+// import { Construct } from 'constructs';
 
-interface EcsServiceStackProps extends cdk.StackProps {
-  cluster: ecs.ICluster;
-  repository: ecr.IRepository;
-}
+// interface EcsServiceStackProps extends cdk.StackProps {
+//   cluster: ecs.ICluster;
+//   repository: ecr.IRepository;
+// }
 
-export class EcsServiceStack extends cdk.Stack {
-  public readonly service: ecs.FargateService;
+// export class EcsServiceStack extends cdk.Stack {
+//   public readonly service: ecs.FargateService;
 
-  constructor(scope: Construct, id: string, props: EcsServiceStackProps) {
-    super(scope, id, props);
+//   constructor(scope: Construct, id: string, props: EcsServiceStackProps) {
+//     super(scope, id, props);
 
-    const loadBalancedFargateService = new ecs_patterns.ApplicationLoadBalancedFargateService(this, 'LaundryService', {
-      cluster: props.cluster,
-      cpu: 256,
-      memoryLimitMiB: 512,
-      desiredCount: 1,
-      taskImageOptions: {
-        image: ecs.ContainerImage.fromRegistry('amazon/amazon-ecs-sample'), // Placeholder image
-        containerPort: 80,
-      },
-      publicLoadBalancer: true,
-    });
+//     const loadBalancedFargateService = new ecs_patterns.ApplicationLoadBalancedFargateService(this, 'LaundryService', {
+//       cluster: props.cluster,
+//       cpu: 256,
+//       memoryLimitMiB: 512,
+//       desiredCount: 1,
+//       taskImageOptions: {
+//         image: ecs.ContainerImage.fromRegistry('amazon/amazon-ecs-sample'), // Placeholder image
+//         containerPort: 80,
+//       },
+//       publicLoadBalancer: true,
+//     });
 
-    this.service = loadBalancedFargateService.service;
+//     this.service = loadBalancedFargateService.service;
 
-    // Output the service name for use in GitHub Actions
-    new cdk.CfnOutput(this, 'EcsServiceName', {
-      value: this.service.serviceName,
-      description: 'Name of the ECS Service',
-    });
-  }
-}
+//     // Output the service name for use in GitHub Actions
+//     new cdk.CfnOutput(this, 'EcsServiceName', {
+//       value: this.service.serviceName,
+//       description: 'Name of the ECS Service',
+//     });
+//   }
+// }
 // import * as cdk from 'aws-cdk-lib';
 // import * as ecs from 'aws-cdk-lib/aws-ecs';
 // import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
@@ -76,3 +76,45 @@ export class EcsServiceStack extends cdk.Stack {
 //     });
 //   }
 // }
+
+import * as cdk from 'aws-cdk-lib';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+import { Construct } from 'constructs';
+
+interface EcsServiceStackProps extends cdk.StackProps {
+  cluster: ecs.ICluster;
+  repository: ecr.IRepository;
+}
+
+export class EcsServiceStack extends cdk.Stack {
+  public readonly service: ecs.FargateService;
+
+  constructor(scope: Construct, id: string, props: EcsServiceStackProps) {
+    super(scope, id, props);
+
+    const loadBalancedFargateService = new ecs_patterns.ApplicationLoadBalancedFargateService(this, 'LaundryService', {
+      cluster: props.cluster,
+      cpu: 256,
+      memoryLimitMiB: 512,
+      desiredCount: 1,
+      taskImageOptions: {
+        image: props.repository 
+          ? ecs.ContainerImage.fromEcrRepository(props.repository) 
+          : ecs.ContainerImage.fromRegistry('amazon/amazon-ecs-sample'),
+        containerName: 'laundry-service-container', // Make sure this matches the name in imageDetail.json
+        containerPort: 80,
+      },
+      publicLoadBalancer: true,
+    });
+
+    this.service = loadBalancedFargateService.service;
+
+    // Output the service name for use in the pipeline
+    new cdk.CfnOutput(this, 'EcsServiceName', {
+      value: this.service.serviceName,
+      description: 'Name of the ECS Service',
+    });
+  }
+}
