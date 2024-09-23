@@ -83,6 +83,7 @@ export class CICDPipelineStack extends cdk.Stack {
       actionName: 'DeployToECS',
       service: props.ecsService,
       imageFile: new codepipeline.ArtifactPath(buildOutput, 'imageDetail.json'),
+      deploymentTimeout: cdk.Duration.minutes(60), // Increase timeout if needed
       runOrder: 2,
     });
 
@@ -106,6 +107,15 @@ export class CICDPipelineStack extends cdk.Stack {
           actions: [deployAction],
         },
       ],
+    });
+    new cdk.CfnOutput(this, 'EcsClusterName', {
+      value: props.ecsCluster.clusterName,
+      description: 'Name of the ECS Cluster',
+    });
+
+    new cdk.CfnOutput(this, 'EcsServiceName', {
+      value: props.ecsService.serviceName,
+      description: 'Name of the ECS Service',
     });
   }
 }
