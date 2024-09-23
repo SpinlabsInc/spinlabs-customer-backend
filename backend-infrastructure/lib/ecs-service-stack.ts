@@ -116,5 +116,10 @@ export class EcsServiceStack extends cdk.Stack {
       value: this.service.serviceName,
       description: 'Name of the ECS Service',
     });
+    
+    new cdk.CfnOutput(this, 'EcsContainerName', {
+      value: 'laundry-service-container',
+      description: 'Name of the ECS Container',
+    });
   }
 }
