@@ -12,11 +12,12 @@ phases:
       - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
   pre_build:
     commands:
+    - |
       # Authenticate to ECR and set a fallback for IMAGE_TAG
-      - echo "Logging into Amazon ECR..."
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
-      - IMAGE_TAG=$(date +%Y%m%d%H%M%S)
-      - echo "IMAGE_TAG: $IMAGE_TAG"
+      echo "Logging into Amazon ECR..." && \
+      aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI && \
+      IMAGE_TAG=$(date +%Y%m%d%H%M%S) && \
+      echo "IMAGE_TAG: $IMAGE_TAG" 
   build:
     commands:
       - echo Build started on `date`
