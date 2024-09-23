@@ -294,6 +294,16 @@ export class CICDPipelineStack extends cdk.Stack {
       resources: ['*'],
     }));
 
+    // Grant permissions to push logs to CloudWatch
+    buildProject.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      resources: ['*'],
+    }));
+
     const buildOutput = new codepipeline.Artifact();
     const buildAction = new codepipeline_actions.CodeBuildAction({
       actionName: 'Build',

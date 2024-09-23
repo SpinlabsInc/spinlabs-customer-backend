@@ -47,14 +47,17 @@ phases:
       - pytest tests
       - echo Building the Docker image...
       - docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+      - docker tag $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION $ECR_REPO_URI:latest
   post_build:
     commands:
       - echo Pushing the Docker image...
       - docker push $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - docker push $ECR_REPO_URI:latest
       - echo Writing image definitions file...
       - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION > imageDetail.json
+      - cat imageDetail.json
 
 artifacts:
-  files: 
+  files:
     - imageDetail.json
   base-directory: Services
