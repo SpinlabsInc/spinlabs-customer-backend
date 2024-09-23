@@ -18,7 +18,7 @@ phases:
       - IMAGE_TAG=$(date +%Y%m%d%H%M%S)
       - echo "IMAGE_TAG: $IMAGE_TAG"
   build:
-    commands:ß
+    commands:
       - echo Build started on `date`
       - echo Building the Docker image...
       # Build the Docker image with the generated IMAGE_TAG
