@@ -40,15 +40,21 @@ phases:
       - cd Services
       - export PYTHONPATH=$PYTHONPATH:$(pwd)
       - echo $PYTHONPATH
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
   build:
     commands:
       - pytest tests
+      - echo Building the Docker image...
+      - docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .
   post_build:
     commands:
-      - echo "Build and tests completed successfully"
-      - docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+      - echo Pushing the Docker image...
       - docker push $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - echo Writing image definitions file...
       - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION > imageDetail.json
 
 artifacts:
-  files: imageDetail.json
+  files: 
+    - imageDetail.json
+  base-directory: Services
