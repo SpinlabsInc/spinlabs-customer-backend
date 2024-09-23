@@ -18,10 +18,8 @@ export class CICDPipelineStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: CICDPipelineStackProps) {
     super(scope, id, props);
 
-    // Fetch the GitHub token secret from Secrets Manager
     const githubToken = secretsmanager.Secret.fromSecretNameV2(this, 'GithubToken', 'GithubToken').secretValueFromJson('GithubToken');
 
-    // Source action: GitHub as source
     const sourceOutput = new codepipeline.Artifact('SourceOutput');
     const sourceAction = new codepipeline_actions.GitHubSourceAction({
       actionName: 'GitHub_Source',
@@ -32,7 +30,6 @@ export class CICDPipelineStack extends cdk.Stack {
       branch: 'main',
     });
 
-    // Build project: Running tests and building Docker image
     const buildProject = new codebuild.PipelineProject(this, 'BuildProject', {
       environment: {
         buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
@@ -45,7 +42,6 @@ export class CICDPipelineStack extends cdk.Stack {
       buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
     });
 
-    // Grant permissions to CodeBuild to push to ECR
     props.ecrRepository.grantPullPush(buildProject.role!);
     buildProject.addToRolePolicy(new iam.PolicyStatement({
       actions: ['secretsmanager:GetSecretValue'],
@@ -70,7 +66,6 @@ export class CICDPipelineStack extends cdk.Stack {
       resources: ['*'],
     }));
 
-    // Build action
     const buildOutput = new codepipeline.Artifact('BuildOutput');
     const buildAction = new codepipeline_actions.CodeBuildAction({
       actionName: 'Build',
@@ -79,14 +74,18 @@ export class CICDPipelineStack extends cdk.Stack {
       outputs: [buildOutput],
     });
 
-    // Deploy action: Deploy to ECS using Docker image from ECR
+    const manualApprovalAction = new codepipeline_actions.ManualApprovalAction({
+      actionName: 'Approve',
+      runOrder: 1,
+    });
+
     const deployAction = new codepipeline_actions.EcsDeployAction({
       actionName: 'DeployToECS',
       service: props.ecsService,
       imageFile: new codepipeline.ArtifactPath(buildOutput, 'imageDetail.json'),
+      runOrder: 2,
     });
 
-    // Create CodePipeline
     new codepipeline.Pipeline(this, 'Pipeline', {
       pipelineName: 'LaundryServicePipeline',
       stages: [
@@ -97,6 +96,10 @@ export class CICDPipelineStack extends cdk.Stack {
         {
           stageName: 'Build',
           actions: [buildAction],
+        },
+        {
+          stageName: 'Approve',
+          actions: [manualApprovalAction],
         },
         {
           stageName: 'Deploy',
