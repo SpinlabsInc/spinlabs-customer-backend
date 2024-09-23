@@ -38,6 +38,7 @@ phases:
       # Generate imageDetail.json for ECS deployment
       - echo Writing image definitions file...
       - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$IMAGE_TAG > imageDetail.json
+      - ls -a
       - cat imageDetail.json
 
 artifacts:
