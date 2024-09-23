@@ -22,7 +22,7 @@ export class CICDPipelineStack extends cdk.Stack {
     const githubToken = secretsmanager.Secret.fromSecretNameV2(this, 'GithubToken', 'GithubToken').secretValueFromJson('GithubToken');
 
     // Source action: GitHub as source
-    const sourceOutput = new codepipeline.Artifact();
+    const sourceOutput = new codepipeline.Artifact('SourceOutput');
     const sourceAction = new codepipeline_actions.GitHubSourceAction({
       actionName: 'GitHub_Source',
       owner: 'SpinlabsInc',
@@ -65,11 +65,20 @@ export class CICDPipelineStack extends cdk.Stack {
       resources: ['*'],
     }));
 
+    // Build action
+    const buildOutput = new codepipeline.Artifact('BuildOutput');
+    const buildAction = new codepipeline_actions.CodeBuildAction({
+      actionName: 'Build',
+      project: buildProject,
+      input: sourceOutput,
+      outputs: [buildOutput],
+    });
+
     // Deploy action: Deploy to ECS using Docker image from ECR
     const deployAction = new codepipeline_actions.EcsDeployAction({
       actionName: 'DeployToECS',
       service: props.ecsService,
-      imageFile: new codepipeline.ArtifactPath(sourceOutput, 'imageDetail.json'),
+      imageFile: new codepipeline.ArtifactPath(buildOutput, 'imageDetail.json'),
     });
 
     // Create CodePipeline
@@ -82,12 +91,7 @@ export class CICDPipelineStack extends cdk.Stack {
         },
         {
           stageName: 'Build',
-          actions: [new codepipeline_actions.CodeBuildAction({
-            actionName: 'Build',
-            project: buildProject,
-            input: sourceOutput,
-            outputs: [sourceOutput],
-          })],
+          actions: [buildAction],
         },
         {
           stageName: 'Deploy',
