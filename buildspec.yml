@@ -32,29 +32,30 @@ phases:
   install:
     runtime-versions:
       python: 3.9
-    commands:
-      - pip install --upgrade pip
-      - pip install -r Services/requirements.txt
   pre_build:
     commands:
-      - cd Services
-      - export PYTHONPATH=$PYTHONPATH:$(pwd)
-      - echo $PYTHONPATH
       - echo Logging in to Amazon ECR...
+      - aws --version
+      - echo $AWS_DEFAULT_REGION
+      - echo $ECR_REPO_URI
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
   build:
     commands:
-      - pytest tests
+      - echo Build started on `date`
       - echo Building the Docker image...
-      - docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .
-      - docker tag $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION $ECR_REPO_URI:latest
+      - cd Services
+      - docker build -t $ECR_REPO_URI:$IMAGE_TAG .
+      - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:latest
   post_build:
     commands:
+      - echo Build completed on `date`
       - echo Pushing the Docker image...
-      - docker push $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - docker push $ECR_REPO_URI:$IMAGE_TAG
       - docker push $ECR_REPO_URI:latest
       - echo Writing image definitions file...
-      - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION > imageDetail.json
+      - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$IMAGE_TAG > imageDetail.json
       - cat imageDetail.json
 
 artifacts:

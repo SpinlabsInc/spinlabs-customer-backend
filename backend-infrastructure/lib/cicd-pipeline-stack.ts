@@ -270,6 +270,7 @@ export class CICDPipelineStack extends cdk.Stack {
       },
       environmentVariables: {
         ECR_REPO_URI: { value: props.ecrRepository.repositoryUri },
+        AWS_DEFAULT_REGION: { value: this.region },
       },
       buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
     });
