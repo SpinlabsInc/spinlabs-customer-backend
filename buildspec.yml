@@ -30,16 +30,25 @@ version: 0.2
 
 phases:
   install:
+    runtime-versions:
+      python: 3.9
     commands:
       - pip install --upgrade pip
       - pip install -r Services/requirements.txt
   pre_build:
     commands:
-      - export PYTHONPATH=$PYTHONPATH:$(pwd)/Services/src  # Set PYTHONPATH to include the src folder
-      - echo $PYTHONPATH  # Debugging to ensure PYTHONPATH is set correctly
+      - cd Services
+      - export PYTHONPATH=$PYTHONPATH:$(pwd)
+      - echo $PYTHONPATH
   build:
     commands:
-      - pytest Services/tests  # Run the tests from the tests directory
+      - pytest tests
   post_build:
     commands:
       - echo "Build and tests completed successfully"
+      - docker build -t $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION .
+      - docker push $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION > imageDetail.json
+
+artifacts:
+  files: imageDetail.json

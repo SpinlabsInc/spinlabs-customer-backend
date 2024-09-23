@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
-from src.main import app  # Use absolute import, assuming src is the top-level directory
+from ..src.main import app  # Use absolute import, assuming src is the top-level directory
 
 client = TestClient(app)
 
