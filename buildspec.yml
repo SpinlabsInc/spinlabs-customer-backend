@@ -21,10 +21,9 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - cd Services
       - echo Building the Docker image...
       # Build the Docker image with the generated IMAGE_TAG
-      - docker build -t $ECR_REPO_URI:$IMAGE_TAG .
+      - docker build -t $ECR_REPO_URI:$IMAGE_TAG -f Services/Dockerfile Services/
       - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:latest
   post_build:
     commands:
@@ -38,7 +37,6 @@ phases:
       # Generate imageDetail.json for ECS deployment
       - echo Writing image definitions file...
       - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$IMAGE_TAG > imageDetail.json
-      - ls -a
       - cat imageDetail.json
 
 artifacts:
