@@ -32,6 +32,12 @@ phases:
   install:
     runtime-versions:
       python: 3.9
+    commands:
+      # Authenticate Docker Hub using AWS Secrets Manager credentials
+      - echo "Authenticating with Docker Hub"
+      - export DOCKER_USERNAME=$(aws secretsmanager get-secret-value --secret-id DockerHubCredentials --query SecretString --output text | jq -r .DOCKERHUB_USERNAME)
+      - export DOCKER_PASSWORD=$(aws secretsmanager get-secret-value --secret-id DockerHubCredentials --query SecretString --output text | jq -r .DOCKERHUB_TOKEN)
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
   pre_build:
     commands:
       - echo "Printing environment variables:"
@@ -40,6 +46,7 @@ phases:
       - echo "ECR_REPO_URI: $ECR_REPO_URI"
       - aws --version
       - aws sts get-caller-identity
+      # Authenticate AWS ECR and set the image tag
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
@@ -47,14 +54,17 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
+      # Build the Docker image using the tag from ECR
       - docker build -t $ECR_REPO_URI:$IMAGE_TAG .
       - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:latest
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker image...
+      # Push the image to ECR
       - docker push $ECR_REPO_URI:$IMAGE_TAG
       - docker push $ECR_REPO_URI:latest
+      # Write the image URI to imageDetail.json
       - echo Writing image definitions file...
       - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$IMAGE_TAG > imageDetail.json
       - cat imageDetail.json
