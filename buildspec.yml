@@ -55,10 +55,11 @@ phases:
       - docker push $ECR_REPO_URI:$IMAGE_TAG
       - docker push $ECR_REPO_URI:latest
       - echo Writing image definitions file...
+      - cd..
       - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$IMAGE_TAG > imageDetail.json
       - cat imageDetail.json
 
 artifacts:
   files:
     - imageDetail.json
-  base-directory: Services
+  base-directory: .
