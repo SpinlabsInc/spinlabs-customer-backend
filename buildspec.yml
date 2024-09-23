@@ -27,6 +27,11 @@ phases:
   post_build:
     commands:
       - echo Build completed on `date`
+      # Authenticate to ECR
+      - echo "Logging into Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI      # Authenticate to ECR and set a fallback for IMAGE_TAG
+      - echo "Logging into Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
       - echo Pushing the Docker image...
       # Push both the specific tag and the "latest" tag to ECR
       - docker push $ECR_REPO_URI:$IMAGE_TAG
