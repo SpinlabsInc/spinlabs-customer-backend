@@ -36,7 +36,7 @@ phases:
       - docker push $ECR_REPO_URI:latest
       # Generate imageDetail.json for ECS deployment
       - echo Writing image definitions file...
-      - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$IMAGE_TAG > imageDetail.json
+      - printf '{"ImageURI":"%s"}\n' "$ECR_REPO_URI:$IMAGE_TAG" > imageDetail.json
       - cat imageDetail.json
 
 artifacts:
