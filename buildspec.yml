@@ -33,30 +33,38 @@ phases:
     runtime-versions:
       python: 3.9
     commands:
+      # Log into Docker Hub (optional, if you're pulling from Docker Hub)
       - echo "Authenticating with Docker Hub"
-      - aws --version
+      - export DOCKER_USERNAME=$(aws secretsmanager get-secret-value --secret-id DockerHubCredentials --query SecretString --output text | jq -r .DOCKERHUB_USERNAME)
+      - export DOCKER_PASSWORD=$(aws secretsmanager get-secret-value --secret-id DockerHubCredentials --query SecretString --output text | jq -r .DOCKERHUB_TOKEN)
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      
   pre_build:
     commands:
-      - echo "Printing environment variables:"
-      - echo "AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"
-      - echo "ECR_REPO_URI: $ECR_REPO_URI"
-      - aws sts get-caller-identity
+      # Authenticate to ECR and set the image tag
       - echo Logging in to Amazon ECR...
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin 448049814374.dkr.ecr.us-east-1.amazonaws.com/laundry-service-repo
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo "ECR_REPO_URI: $ECR_REPO_URI"
+      - echo "IMAGE_TAG: $IMAGE_TAG"
+
   build:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
+      # Build the Docker image and tag it with both the commit hash and "latest"
       - docker build -t $ECR_REPO_URI:$IMAGE_TAG .
       - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:latest
+
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker image...
+      # Push both the commit hash tag and the "latest" tag to ECR
       - docker push $ECR_REPO_URI:$IMAGE_TAG
       - docker push $ECR_REPO_URI:latest
+      # Generate imageDetail.json (used for ECS deployment)
       - echo Writing image definitions file...
       - printf '{"ImageURI":"%s"}' $ECR_REPO_URI:$IMAGE_TAG > imageDetail.json
       - cat imageDetail.json
