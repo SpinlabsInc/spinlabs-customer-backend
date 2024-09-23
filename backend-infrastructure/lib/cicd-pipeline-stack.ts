@@ -237,8 +237,8 @@ import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 interface CICDPipelineStackProps extends cdk.StackProps {
@@ -251,8 +251,10 @@ export class CICDPipelineStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: CICDPipelineStackProps) {
     super(scope, id, props);
 
+    // Fetch the GitHub token secret from Secrets Manager
     const githubToken = secretsmanager.Secret.fromSecretNameV2(this, 'GithubToken', 'GithubToken').secretValueFromJson('GithubToken');
 
+    // Source action: GitHub as source
     const sourceOutput = new codepipeline.Artifact();
     const sourceAction = new codepipeline_actions.GitHubSourceAction({
       actionName: 'GitHub_Source',
@@ -263,6 +265,7 @@ export class CICDPipelineStack extends cdk.Stack {
       branch: 'main',
     });
 
+    // Build project: Running tests and building Docker image
     const buildProject = new codebuild.PipelineProject(this, 'BuildProject', {
       environment: {
         buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
@@ -275,7 +278,7 @@ export class CICDPipelineStack extends cdk.Stack {
       buildSpec: codebuild.BuildSpec.fromSourceFilename('buildspec.yml'),
     });
 
-    // Grant permissions to the build project
+    // Grant permissions to CodeBuild to push to ECR
     props.ecrRepository.grantPullPush(buildProject.role!);
     buildProject.addToRolePolicy(new iam.PolicyStatement({
       actions: [
@@ -295,30 +298,14 @@ export class CICDPipelineStack extends cdk.Stack {
       resources: ['*'],
     }));
 
-    // Grant permissions to push logs to CloudWatch
-    buildProject.addToRolePolicy(new iam.PolicyStatement({
-      actions: [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
-      resources: ['*'],
-    }));
-
-    const buildOutput = new codepipeline.Artifact();
-    const buildAction = new codepipeline_actions.CodeBuildAction({
-      actionName: 'Build',
-      project: buildProject,
-      input: sourceOutput,
-      outputs: [buildOutput],
-    });
-
+    // Deploy action: Deploy to ECS using Docker image from ECR
     const deployAction = new codepipeline_actions.EcsDeployAction({
       actionName: 'DeployToECS',
       service: props.ecsService,
-      imageFile: buildOutput.atPath('imageDetail.json'),
+      imageFile: new codepipeline.ArtifactPath(sourceOutput, 'imageDetail.json'),
     });
 
+    // Create CodePipeline
     new codepipeline.Pipeline(this, 'Pipeline', {
       pipelineName: 'LaundryServicePipeline',
       stages: [
@@ -328,7 +315,12 @@ export class CICDPipelineStack extends cdk.Stack {
         },
         {
           stageName: 'Build',
-          actions: [buildAction],
+          actions: [new codepipeline_actions.CodeBuildAction({
+            actionName: 'Build',
+            project: buildProject,
+            input: sourceOutput,
+            outputs: [sourceOutput],
+          })],
         },
         {
           stageName: 'Deploy',
